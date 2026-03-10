@@ -1,0 +1,60 @@
+# docker-compose.yml — A Tasca do Microserviço
+version: '3.8'
+
+services:
+
+  # ─── Base de dados PostgreSQL ───────────────────────────
+  db:
+    image: postgres:15-alpine
+    container_name: tasca-db
+    environment:
+      POSTGRES_USER: zecouves
+      POSTGRES_PASSWORD: couves123
+      POSTGRES_DB: tascadb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zecouves"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Product Service ──────────────────────────────────
+  product-service:
+    build:
+      context: ./product-service/product-service
+    container_name: tasca-products
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/tascadb
+      SPRING_DATASOURCE_USERNAME: zecouves
+      SPRING_DATASOURCE_PASSWORD: couves123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ─── Order Service ────────────────────────────────────
+  order-service:
+    build:
+      context: ./order-service/order-service
+    container_name: tasca-orders
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/tascadb
+      SPRING_DATASOURCE_USERNAME: zecouves
+      SPRING_DATASOURCE_PASSWORD: couves123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      PRODUCT_SERVICE_URL: http://product-service:8080
+    depends_on:
+      db:
+        condition: service_healthy
+      product-service:
+        condition: service_started
+
+volumes:
+  postgres-data:
